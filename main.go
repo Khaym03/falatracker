@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"log"
 
+	"github.com/go-rod/rod/lib/proto"
 	"github.com/joho/godotenv"
 )
 
@@ -20,11 +22,23 @@ func main() {
 		log.Fatal(err)
 	}
 
+	ctx := context.Background()
+
 	browser, err := NewBrowser()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	defer browser.MustClose()
+
+	page, err := browser.Page(proto.TargetCreateTarget{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = Login(ctx, page, cred)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 }

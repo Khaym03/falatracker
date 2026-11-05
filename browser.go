@@ -20,6 +20,7 @@ func NewBrowser() (*rod.Browser, error) {
 	u, err := launcher.New().
 		Bin(path).
 		Leakless(false).
+		Headless(false).
 		Launch()
 	if err != nil {
 		return nil, err
