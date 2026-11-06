@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
@@ -15,6 +17,7 @@ const passwordInputSelector = `input[Id="password"]`
 const loginBtn = `form button`
 
 func Login(ctx context.Context, page *rod.Page, cred credential) error {
+
 	err := page.Navigate(loginURL)
 	if err != nil {
 		return fmt.Errorf("fail to navigate login: %s", loginURL)
@@ -24,30 +27,59 @@ func Login(ctx context.Context, page *rod.Page, cred credential) error {
 		return err
 	}
 
+	if IsAlreadyLogedIn(ctx, page) {
+		return nil
+	}
+
+	// Llenar usuario
 	el, err := page.Element(userInputSelector)
 	if err != nil {
 		return fmt.Errorf("cannot find user input: %w", err)
 	}
-
 	if err = el.Input(cred.User); err != nil {
 		return err
 	}
 
+	// Llenar contraseña
 	el, err = page.Element(passwordInputSelector)
 	if err != nil {
 		return fmt.Errorf("cannot find password input: %w", err)
 	}
-
 	if err = el.Input(cred.Password); err != nil {
 		return err
 	}
 
-	el, err = page.Race().Element(loginBtn).Handle(func(e *rod.Element) error {
-		return e.Click(proto.InputMouseButtonLeft, 1)
-	}).Do()
+	// Preparamos la espera de navegación
+	waitNav := page.MustWaitNavigation()
+
+	btn, err := page.Element(loginBtn)
 	if err != nil {
 		return fmt.Errorf("cannot find login button: %w", err)
 	}
 
-	return page.WaitLoad()
+	if err = btn.Click(proto.InputMouseButtonLeft, 1); err != nil {
+		return fmt.Errorf("fail to click login button: %w", err)
+	}
+
+	// Esperamos a que termine la cadena de redirecciones del login
+	waitNav()
+
+	// ¡Listo! Ya estamos dentro del portal (en la página de bienvenida/dashboard).
+	return nil
+}
+
+func IsAlreadyLogedIn(ctx context.Context, page *rod.Page) bool {
+	if strings.Contains(page.MustInfo().URL, "fbusinesscenter.com/landing/") {
+		return true
+	}
+	loginEl, err := page.Timeout(20 * time.Second).Element(`a[href="/login"]`)
+
+	if err == nil {
+		waitNav := page.MustWaitNavigation()
+		loginEl.MustClick()
+		waitNav()
+		return true
+	}
+
+	return false
 }

@@ -29,7 +29,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	defer browser.MustClose()
+	// defer browser.MustClose()
 
 	page, err := browser.Page(proto.TargetCreateTarget{})
 	if err != nil {
@@ -40,5 +40,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	store := make(fakeStore)
+	CollectOC(ctx, page, store)
 
 }
