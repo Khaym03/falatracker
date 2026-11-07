@@ -7,7 +7,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"os"
 )
 
 type server struct {
@@ -57,10 +56,6 @@ func (s *server) shutdown(ctx context.Context) error {
 }
 
 func (s *server) handlerShutdown(w http.ResponseWriter, r *http.Request) {
-	if os.Getenv("ENV") == "production" {
-		http.NotFound(w, r)
-		return
-	}
 	w.WriteHeader(http.StatusOK)
 	go s.cancel()
 }
