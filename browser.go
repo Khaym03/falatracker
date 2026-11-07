@@ -21,6 +21,8 @@ func NewBrowser() (*rod.Browser, error) {
 		Bin(path).
 		Leakless(false).
 		Headless(false).
+		UserDataDir("./rod_profile").
+		RemoteDebuggingPort(9222).
 		// Set("disable-popup-blocking", "true"). // Desactiva bloqueos extra o maneja comportamiento
 		// Set("disable-notifications", "").      // Desactiva el popup de notificaciones
 		// Set("disable-infobars", "").
@@ -28,6 +30,7 @@ func NewBrowser() (*rod.Browser, error) {
 	if err != nil {
 		return nil, err
 	}
+	launcher.New().Kill()
 
 	browser := rod.New().Trace(true).ControlURL(u)
 

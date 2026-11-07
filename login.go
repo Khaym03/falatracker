@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/go-rod/rod"
@@ -17,8 +16,8 @@ const passwordInputSelector = `input[Id="password"]`
 const loginBtn = `form button`
 
 func Login(ctx context.Context, page *rod.Page, cred credential) error {
-
-	err := page.Navigate(loginURL)
+	wait := page.MustWaitNavigation()
+	err := page.Navigate(OC_URL)
 	if err != nil {
 		return fmt.Errorf("fail to navigate login: %s", loginURL)
 	}
@@ -27,8 +26,18 @@ func Login(ctx context.Context, page *rod.Page, cred credential) error {
 		return err
 	}
 
+	wait()
 	if IsAlreadyLogedIn(ctx, page) {
 		return nil
+	}
+
+	err = page.Navigate(loginURL)
+	if err != nil {
+		return fmt.Errorf("fail to navigate login: %s", loginURL)
+	}
+
+	if err = page.WaitLoad(); err != nil {
+		return err
 	}
 
 	// Llenar usuario
@@ -64,20 +73,19 @@ func Login(ctx context.Context, page *rod.Page, cred credential) error {
 	// Esperamos a que termine la cadena de redirecciones del login
 	waitNav()
 
-	// ¡Listo! Ya estamos dentro del portal (en la página de bienvenida/dashboard).
+	loginEl, err := page.Timeout(20 * time.Second).Element(`a[href="/login"]`)
+	if err == nil {
+		waitNav := page.Timeout(20 * time.Second).MustWaitNavigation()
+		loginEl.MustClick()
+		waitNav()
+	}
 	return nil
 }
 
 func IsAlreadyLogedIn(ctx context.Context, page *rod.Page) bool {
-	if strings.Contains(page.MustInfo().URL, "fbusinesscenter.com/landing/") {
-		return true
-	}
-	loginEl, err := page.Timeout(20 * time.Second).Element(`a[href="/login"]`)
+	_, err := page.Timeout(20 * time.Second).ElementX(`//input[@value='Falabella']`)
 
 	if err == nil {
-		waitNav := page.MustWaitNavigation()
-		loginEl.MustClick()
-		waitNav()
 		return true
 	}
 

@@ -31,6 +31,13 @@ func main() {
 
 	// defer browser.MustClose()
 
+	pages, err := browser.Pages()
+	if !pages.Empty() && len(pages) > 1 {
+		for _, p := range pages[1:] {
+			p.MustClose()
+		}
+	}
+
 	page, err := browser.Page(proto.TargetCreateTarget{})
 	if err != nil {
 		log.Fatal(err)

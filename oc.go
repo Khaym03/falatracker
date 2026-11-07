@@ -37,25 +37,21 @@ var _ Store = (*fakeStore)(nil)
 func CollectOC(ctx context.Context, page *rod.Page, s Store) error {
 	var err error
 
-	loginEl, err := page.Timeout(20 * time.Second).Element(`a[href="/login"]`)
-	if err == nil {
-		waitNav := page.MustWaitNavigation()
-		loginEl.MustClick()
-		waitNav()
-	}
+	currentURL := page.MustInfo().URL
 
-	// Buscar y hacer clic en la tarjeta de Purchase Orders
-	waitNav := page.MustWaitNavigation()
-	card, err := page.Timeout(15 * time.Second).Element(purchaseCardSelector)
-	if err != nil {
-		return fmt.Errorf("no se encontró la tarjeta de purchase orders: %w", err)
-	}
+	if currentURL != OC_URL {
+		// Buscar y hacer clic en la tarjeta de Purchase Orders
+		waitNav := page.Timeout(20 * time.Second).MustWaitNavigation()
+		card, err := page.Timeout(15 * time.Second).Element(purchaseCardSelector)
+		if err != nil {
+			return fmt.Errorf("no se encontró la tarjeta de purchase orders: %w", err)
+		}
 
-	if err = card.Click(proto.InputMouseButtonLeft, 1); err != nil {
-		return fmt.Errorf("no se pudo hacer clic en la tarjeta: %w", err)
+		if err = card.Click(proto.InputMouseButtonLeft, 1); err != nil {
+			return fmt.Errorf("no se pudo hacer clic en la tarjeta: %w", err)
+		}
+		waitNav() // Esperamos a que cargue la vista de órdenes
 	}
-	waitNav() // Esperamos a que cargue la vista de órdenes
-
 	for {
 		// Como es una SPA, hacemos clic en la pestaña de historial directamente
 		page.MustElement(historycOCTabSelector).MustClick()
@@ -101,19 +97,55 @@ func CollectOC(ctx context.Context, page *rod.Page, s Store) error {
 			page.MustElement(openRowSelector).MustClick()
 			wait()
 
-			downloadBtns := page.MustElements(`button[Id="donwload-button"]`)
-			downloadBtns[0].MustClick()
+			clickButtonWithRetry := func(index int) error {
+				maxRetries := 2 // Intento inicial + 1 reintento
+				var err error
+
+				for attempt := 1; attempt <= maxRetries; attempt++ {
+					err = rod.Try(func() {
+						// Timeout de 5 segundos para buscar el botón y esperar a que sea visible
+						p := page.Timeout(5 * time.Second)
+
+						btns := p.MustElements(`button[Id="donwload-button"]`)
+						if len(btns) <= index {
+							panic("No se encontró el botón en el índice indicado")
+						}
+
+						btn := btns[index]
+						btn.MustWaitVisible()
+						btn.MustClick()
+					})
+
+					// Si salió bien, salimos de la función sin error
+					if err == nil {
+						return nil
+					}
+
+					// Si falló y quedan intentos, esperamos 1 segundo antes de reintentar
+					if attempt < maxRetries {
+						time.Sleep(1 * time.Second)
+					}
+				}
+				return err
+			}
+
+			if err := clickButtonWithRetry(0); err != nil {
+				// Maneja el error si ambos intentos fallan (ej. log o continuar)
+			}
 			time.Sleep(5 * time.Second)
 			page.MustSearch("Excel").MustClick()
 
-			downloadBtns[1].MustClick()
+			// 2. Segundo botón con reintento
+			if err := clickButtonWithRetry(1); err != nil {
+				// Maneja el error si ambos intentos fallan
+			}
 			time.Sleep(5 * time.Second)
 			page.MustSearch("Excel").MustClick()
 
 			// refactorizar en el futuro
 			time.Sleep(10 * time.Second)
 
-			wait = page.MustWaitNavigation()
+			wait = page.Timeout(20 * time.Second).MustWaitNavigation()
 			page.MustNavigate(OC_URL)
 			wait()
 
@@ -124,6 +156,38 @@ func CollectOC(ctx context.Context, page *rod.Page, s Store) error {
 		}
 	}
 	return nil
+}
+
+func clickDownloadButton(page *rod.Page) error {
+	var err error
+	maxRetries := 2 // Intento inicial + 1 reintento
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		// Aplicamos un timeout de 5 segundos solo para la espera y el clic de este intento
+		err = rod.Try(func() {
+			// Buscamos el botón y esperamos a que sea visible con un timeout de 5s
+			btn := page.Timeout(5 * time.Second).MustElement("button#donwload-button")
+
+			// Opcional: asegurarte de que sea clickeable antes de hacer clic
+			btn.MustWaitVisible()
+
+			// Hacemos clic
+			btn.MustClick()
+		})
+
+		// Si no hubo error, rompemos el ciclo porque salió bien
+		if err == nil {
+			return nil
+		}
+
+		// Si falló y aún nos quedan intentos, esperamos un momento antes de reintentar
+		if attempt < maxRetries {
+			time.Sleep(1 * time.Second) // Pausa breve entre intentos
+		}
+	}
+
+	// Si llega aquí, falló incluso después del reintento
+	return err
 }
 
 const historycOCTabSelector = `div[id="single-spa-application:purchaseOrders"] div[aria-label="po tabs"][role="tablist"] button:nth-of-type(2)`
