@@ -2,52 +2,69 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-	"github.com/go-rod/rod/lib/proto"
 	"github.com/joho/godotenv"
 )
 
-var user string
-var password string
-
 func main() {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
 
+	status := run(ctx, cancel)
+	cancel()
+	os.Exit(status)
+}
+
+func run(ctx context.Context, cancel context.CancelFunc) int {
+	store := make(fakeStore)
+
+	s := newServer(cancel)
+	var serverErr error
+	go func() {
+		serverErr = s.start()
+	}()
+
 	cred, err := GetCredentialFromENV()
 	if err != nil {
-		log.Fatal(err)
+		fmt.Fprintf(os.Stderr, "failed to get cred env: %v\n", err)
 	}
-
-	ctx := context.Background()
 
 	browser, err := NewBrowser()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// defer browser.MustClose()
+	t := NewTracker(browser, store, cred)
+	go func() {
+		t.Start(ctx, 3*time.Minute)
+	}()
 
-	pages, err := browser.Pages()
-	if !pages.Empty() && len(pages) > 1 {
-		for _, p := range pages[1:] {
-			p.MustClose()
-		}
+	<-ctx.Done()
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := s.shutdown(shutdownCtx); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to shutdown server: %v\n", err)
+		return 1
+	}
+	if err := t.shutdown(shutdownCtx); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to shutdown tracker: %v\n", err)
+		return 1
+	}
+	if serverErr != nil {
+		fmt.Fprintf(os.Stderr, "server error: %v\n", serverErr)
+		return 1
 	}
 
-	page, err := browser.Page(proto.TargetCreateTarget{})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = Login(ctx, page, cred)
-	if err != nil {
-		log.Fatal(err)
-	}
-	store := make(fakeStore)
-	CollectOC(ctx, page, store)
-
+	return 0
 }
