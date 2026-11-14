@@ -5,10 +5,13 @@ go 1.27.0
 require (
 	github.com/go-rod/rod v0.116.2
 	github.com/joho/godotenv v1.5.1
+	github.com/spf13/cobra v1.10.2
+	github.com/spf13/pflag v1.1.0
 	github.com/xuri/excelize/v2 v2.11.1
 )
 
 require (
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/richardlehane/mscfb v1.0.9 // indirect
 	github.com/richardlehane/msoleps v1.0.6 // indirect
 	github.com/tiendc/go-deepcopy v1.7.2 // indirect
