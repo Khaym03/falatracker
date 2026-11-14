@@ -94,14 +94,12 @@ func TestMemoryStoreConcurrent(t *testing.T) {
 	s := NewMemoryStore()
 	var wg sync.WaitGroup
 	for i := range 50 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			n := fmt.Sprint(i % 10)
 			_ = s.Save(record(n, StatusReady))
 			_ = s.IsProcessed(n)
 			_ = s.List("")
-		}()
+		})
 	}
 	wg.Wait()
 }

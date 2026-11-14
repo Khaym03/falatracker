@@ -28,8 +28,6 @@ func setCredentials(t *testing.T, user, password *string) {
 	}
 }
 
-func ptr(s string) *string { return &s }
-
 // execute runs the root command with args and returns the config passed to run.
 func execute(t *testing.T, args ...string) (app.Config, error) {
 	t.Helper()
@@ -50,7 +48,7 @@ func execute(t *testing.T, args ...string) (app.Config, error) {
 }
 
 func TestDefaults(t *testing.T) {
-	setCredentials(t, ptr("user"), ptr("secret"))
+	setCredentials(t, new("user"), new("secret"))
 
 	cfg, err := execute(t)
 	if err != nil {
@@ -79,7 +77,7 @@ func TestDefaults(t *testing.T) {
 
 // A bad template is detected at startup, before the browser is launched.
 func TestInvalidTemplateFailsAtStartup(t *testing.T) {
-	setCredentials(t, ptr("u"), ptr("p"))
+	setCredentials(t, new("u"), new("p"))
 	_, err := execute(t, "--template", filepath.Join(t.TempDir(), "missing.xlsx"))
 	if err == nil || !strings.Contains(err.Error(), "open template") {
 		t.Fatalf("error = %v, want a template error", err)
@@ -87,7 +85,7 @@ func TestInvalidTemplateFailsAtStartup(t *testing.T) {
 }
 
 func TestFlags(t *testing.T) {
-	setCredentials(t, ptr("user"), ptr("secret"))
+	setCredentials(t, new("user"), new("secret"))
 
 	cfg, err := execute(t,
 		"--env", "production",
@@ -136,12 +134,12 @@ func TestInvalidInput(t *testing.T) {
 		args     []string
 		wantErr  string
 	}{
-		{name: "missing password", user: ptr("user"), wantErr: "missing password"},
+		{name: "missing password", user: new("user"), wantErr: "missing password"},
 		{name: "missing both", wantErr: "missing user and password"},
-		{name: "unknown env", user: ptr("u"), password: ptr("p"), args: []string{"--env", "staging"}, wantErr: "unknown env"},
-		{name: "bad log level", user: ptr("u"), password: ptr("p"), args: []string{"--log-level", "loud"}, wantErr: "invalid log level"},
-		{name: "zero interval", user: ptr("u"), password: ptr("p"), args: []string{"--interval", "0s"}, wantErr: "--interval"},
-		{name: "unexpected argument", user: ptr("u"), password: ptr("p"), args: []string{"extra"}, wantErr: "unknown command"},
+		{name: "unknown env", user: new("u"), password: new("p"), args: []string{"--env", "staging"}, wantErr: "unknown env"},
+		{name: "bad log level", user: new("u"), password: new("p"), args: []string{"--log-level", "loud"}, wantErr: "invalid log level"},
+		{name: "zero interval", user: new("u"), password: new("p"), args: []string{"--interval", "0s"}, wantErr: "--interval"},
+		{name: "unexpected argument", user: new("u"), password: new("p"), args: []string{"extra"}, wantErr: "unknown command"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -155,7 +153,7 @@ func TestInvalidInput(t *testing.T) {
 }
 
 func TestRunErrorIsReturned(t *testing.T) {
-	setCredentials(t, ptr("u"), ptr("p"))
+	setCredentials(t, new("u"), new("p"))
 	boom := errors.New("boom")
 
 	cmd := newRootCmd(func(context.Context, app.Config, *slog.Logger) error { return boom })

@@ -3,6 +3,7 @@ package order
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"sort"
 	"sync"
 	"time"
@@ -92,9 +93,7 @@ func (s *MemoryStore) snapshot() map[string]Record {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	cp := make(map[string]Record, len(s.records))
-	for k, v := range s.records {
-		cp[k] = v
-	}
+	maps.Copy(cp, s.records)
 	return cp
 }
 
