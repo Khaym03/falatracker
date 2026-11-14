@@ -1,2 +1,7 @@
 .env
 rod_profile/
+logs/
+bin/
+coverage.out
+# order store and downloaded reports: real commercial data, never commit
+data/
