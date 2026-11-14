@@ -1,0 +1,101 @@
+version: '3'
+
+vars:
+  BIN: bin/falatracker{{exeExt}}
+  VERSION:
+    sh: git describe --tags --always --dirty 2>nul || echo "dev"
+  COMMIT:
+    sh: git rev-parse --short HEAD 2>nul || echo "unknown"
+  DATE:
+    sh: git show -s --format=%cI HEAD 2>nul || echo "unknown"
+
+tasks:
+  default:
+    desc: List the available tasks
+    cmds:
+      - task --list
+    silent: true
+
+  build:
+    desc: "Build the binary into bin/ with automatic version, commit and date injection"
+    cmds:
+      - >
+        go build -ldflags="
+        -X github.com/Khaym03/falatracker/internal/version.Version={{.VERSION}}
+        -X github.com/Khaym03/falatracker/internal/version.Commit={{.COMMIT}}
+        -X github.com/Khaym03/falatracker/internal/version.Date={{.DATE}}"
+        -o {{.BIN}} .
+
+  run:
+    desc: Run in development (text logs). Extra flags after --, e.g. task run -- --headless
+    cmds:
+      - go run . {{.CLI_ARGS}}
+
+  run:prod:
+    desc: Run in production (JSON logs, headless)
+    cmds:
+      - go run . --env production --headless {{.CLI_ARGS}}
+
+  convert:
+    desc: Convert downloaded reports without the browser, e.g. task convert -- --products oc-1-products-details.xlsx --distribution oc-1-distributions-details.xlsx
+    cmds:
+      - go run . convert {{.CLI_ARGS}}
+
+  version:
+    desc: Build and print build information
+    deps: [build]
+    cmds:
+      - '{{.BIN}} version'
+
+  test:
+    desc: Run all tests (browser tests need Chrome/Chromium)
+    cmds:
+      - go test ./...
+
+  test:short:
+    desc: Run tests without the browser integration tests
+    cmds:
+      - go test -short ./...
+
+  test:race:
+    desc: Run all tests with the race detector
+    cmds:
+      - go test -race ./...
+
+  cover:
+    desc: Run tests and open the coverage report
+    cmds:
+      - go test -coverprofile=coverage.out ./...
+      - go tool cover -html=coverage.out
+
+  lint:
+    desc: Check formatting and run go vet
+    cmds:
+      - cmd: test -z "$(gofmt -l .)" || (gofmt -l . && echo "run 'task fmt'" && exit 1)
+      - go vet ./...
+
+  fmt:
+    desc: Format the code
+    cmds:
+      - gofmt -w .
+
+  tidy:
+    desc: Tidy go.mod and go.sum
+    cmds:
+      - go mod tidy
+
+  check:
+    desc: Run lint and race tests (before committing)
+    cmds:
+      - task: lint
+      - task: test:race
+
+  shutdown:
+    desc: Ask a running instance to shut down
+    cmds:
+      - curl -X POST http://localhost:2027/shutdown
+
+  clean:
+    desc: Remove build output and coverage files
+    cmds:
+      - rm -rf bin coverage.out
