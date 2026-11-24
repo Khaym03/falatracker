@@ -2,6 +2,17 @@
 rod_profile/
 logs/
 bin/
+build/
 coverage.out
 # order store and downloaded reports: real commercial data, never commit
 data/
+# Windows packaging and WiX v5 build artifacts
+*.exe
+*.syso
+*.msi
+*.wixpdb
+*.wixobj
+*.cab
+*.log
+packaging/windows/bin/
+packaging/windows/obj/

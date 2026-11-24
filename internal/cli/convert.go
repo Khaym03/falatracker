@@ -3,6 +3,8 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -33,7 +35,7 @@ func addConversionFlags(fs *pflag.FlagSet, o *conversionOptions) {
 // converter loads the template (failing fast if it is invalid) and builds
 // the Falabella converter.
 func (o conversionOptions) converter() (*falabella.Converter, error) {
-	t, err := standard.LoadTemplate(o.template)
+	t, err := standard.LoadTemplate(resolveTemplatePath(o.template))
 	if err != nil {
 		return nil, err
 	}
@@ -47,6 +49,31 @@ func (o conversionOptions) converter() (*falabella.Converter, error) {
 		customer.VATPct = &vat
 	}
 	return falabella.NewConverter(t, customer, falabella.NoCatalog{}), nil
+}
+
+// resolveTemplatePath returns path as-is when it is absolute or exists in the
+// current working directory; otherwise it looks for path next to the running
+// executable so an installed binary finds its bundled template from any folder.
+func resolveTemplatePath(path string) string {
+	return resolveTemplatePathFrom(path, os.Executable)
+}
+
+func resolveTemplatePathFrom(path string, executable func() (string, error)) string {
+	if path == "" || filepath.IsAbs(path) {
+		return path
+	}
+	if _, err := os.Stat(path); err == nil {
+		return path
+	}
+	exe, err := executable()
+	if err != nil {
+		return path
+	}
+	candidate := filepath.Join(filepath.Dir(exe), path)
+	if _, err := os.Stat(candidate); err == nil {
+		return candidate
+	}
+	return path
 }
 
 // newConvertCmd converts already downloaded reports without opening the

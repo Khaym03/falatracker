@@ -1,0 +1,19 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <InstallerPlatform Condition="'$(InstallerPlatform)' == ''">x64</InstallerPlatform>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">0.1.0</ProductVersion>
+    <BinPath Condition="'$(BinPath)' == ''">..\..\build\falatracker.exe</BinPath>
+    <TemplatePath Condition="'$(TemplatePath)' == ''">..\..\templates\standard.xlsx</TemplatePath>
+    <OutputName>falatracker-$(ProductVersion)-$(InstallerPlatform)</OutputName>
+    <OutputPath Condition="'$(OutputPath)' == ''">..\..\build\</OutputPath>
+    <IntermediateOutputPath>..\..\build\obj\$(InstallerPlatform)\</IntermediateOutputPath>
+    <DefineConstants>$(DefineConstants);ProductVersion=$(ProductVersion);BinPath=$(BinPath);TemplatePath=$(TemplatePath)</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Firewall.wixext" Version="5.0.2" />
+    <PackageReference Include="WixToolset.UI.wixext" Version="5.0.2" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="5.0.2" />
+  </ItemGroup>
+</Project>

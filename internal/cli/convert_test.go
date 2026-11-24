@@ -93,3 +93,42 @@ func TestConvertCommandErrors(t *testing.T) {
 		t.Error("missing file: expected an error")
 	}
 }
+
+func TestResolveTemplatePathFallback(t *testing.T) {
+	installDir := t.TempDir()
+	tplDir := filepath.Join(installDir, "templates")
+	if err := os.MkdirAll(tplDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	bundled := filepath.Join(tplDir, "standard.xlsx")
+	if err := os.WriteFile(bundled, []byte("stub"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fakeExe := func() (string, error) {
+		return filepath.Join(installDir, "falatracker.exe"), nil
+	}
+
+	// Relative path not present in CWD falls back to executable directory.
+	cwd := t.TempDir()
+	t.Chdir(cwd)
+	if got := resolveTemplatePathFrom("templates/standard.xlsx", fakeExe); got != bundled {
+		t.Errorf("fallback = %q, want %q", got, bundled)
+	}
+
+	// Missing template returns the original path unchanged.
+	if got := resolveTemplatePathFrom("templates/missing.xlsx", fakeExe); got != "templates/missing.xlsx" {
+		t.Errorf("missing = %q, want original path", got)
+	}
+
+	// Existing relative path in CWD takes precedence over executable directory.
+	localTplDir := filepath.Join(cwd, "templates")
+	if err := os.MkdirAll(localTplDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(localTplDir, "standard.xlsx"), []byte("local"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := resolveTemplatePathFrom("templates/standard.xlsx", fakeExe); got != "templates/standard.xlsx" {
+		t.Errorf("cwd precedence = %q, want original relative path", got)
+	}
+}

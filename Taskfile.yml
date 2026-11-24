@@ -8,6 +8,12 @@ vars:
     sh: git rev-parse --short HEAD 2>nul || echo "unknown"
   DATE:
     sh: git show -s --format=%cI HEAD 2>nul || echo "unknown"
+  GIT_MSI_VERSION:
+    sh: powershell -NoProfile -Command "$t = git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' 2>$null; if ($LASTEXITCODE -eq 0 -and $t) { ($t.Trim() -replace '^v','') } else { '0.1.0' }"
+  MSI_VERSION: '{{.MSI_VERSION | default .GIT_MSI_VERSION}}'
+  ARCH: '{{.ARCH | default "x64"}}'
+  BUILD_DIR: build
+  MSI_PATH: '{{.BUILD_DIR}}/falatracker-{{.MSI_VERSION}}-{{.ARCH}}.msi'
 
 tasks:
   default:
@@ -95,7 +101,46 @@ tasks:
     cmds:
       - curl -X POST http://localhost:2027/shutdown
 
-  clean:
-    desc: Remove build output and coverage files
+  tools:install:
+    desc: Install required Go packaging tools (go-winres)
     cmds:
-      - rm -rf bin coverage.out
+      - go install github.com/tc-hib/go-winres@latest
+
+  msi:
+    desc: Build binary with Windows metadata and package the WiX v5 MSI
+    cmds:
+      - go vet ./...
+      - powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-msi.ps1 -Version "{{.MSI_VERSION}}" -Arch "{{.ARCH}}"
+
+  msi:sign:
+    desc: Build and Authenticode-sign both the binary and MSI (requires CERT_THUMBPRINT)
+    preconditions:
+      - sh: 'powershell -NoProfile -Command "if ([string]::IsNullOrWhiteSpace(''{{.CERT_THUMBPRINT}}'')) { exit 1 }"'
+        msg: "Set CERT_THUMBPRINT (e.g. task msi:sign CERT_THUMBPRINT=YOUR_SHA1)"
+    cmds:
+      - go vet ./...
+      - powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-msi.ps1 -Version "{{.MSI_VERSION}}" -Arch "{{.ARCH}}" -SignCertThumbprint "{{.CERT_THUMBPRINT}}"
+
+  release:tag:
+    desc: Create an annotated Git tag vX.Y.Z to trigger the release workflow
+    preconditions:
+      - sh: 'powershell -NoProfile -Command "if (''{{.TAG}}'' -notmatch ''^v\d+\.\d+\.\d+$'') { exit 1 }"'
+        msg: "Provide TAG in vX.Y.Z format (e.g. task release:tag TAG=v0.7.0)"
+    cmds:
+      - git tag -a "{{.TAG}}" -m "Release {{.TAG}}"
+      - powershell -NoProfile -Command "Write-Host 'Tag {{.TAG}} created. Run: git push origin {{.TAG}}' -ForegroundColor Green"
+
+  install:silent:
+    desc: Silently install the built MSI (run from an elevated Administrator shell)
+    cmds:
+      - msiexec /i "{{.MSI_PATH}}" /qn /norestart /L*v "{{.BUILD_DIR}}/install.log"
+
+  uninstall:silent:
+    desc: Silently uninstall the built MSI (run from an elevated Administrator shell)
+    cmds:
+      - msiexec /x "{{.MSI_PATH}}" /qn /norestart /L*v "{{.BUILD_DIR}}/uninstall.log"
+
+  clean:
+    desc: Remove build output, MSI artifacts, coverage files, and stray .syso files
+    cmds:
+      - powershell -NoProfile -Command "Remove-Item -Path 'bin','{{.BUILD_DIR}}','coverage.out' -Recurse -Force -ErrorAction SilentlyContinue; Get-ChildItem -Filter '*.syso' -File -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue"

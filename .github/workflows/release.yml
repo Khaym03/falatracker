@@ -1,0 +1,138 @@
+name: Release Windows MSI
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build without leading v (e.g. 0.7.0). Does not publish a GitHub Release.'
+        required: true
+        default: '0.7.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build MSI (${{ matrix.arch }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version from Git tag (Single Source of Truth)
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $ver = "${{ inputs.version }}" -replace '^v', ''
+          } else {
+            $ver = "${{ github.ref_name }}" -replace '^v', ''
+          }
+          if ($ver -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Invalid semantic version '$ver'. Expected Major.Minor.Patch."
+          }
+          "value=$ver" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Set up .NET SDK (for WiX v5 WixToolset.Sdk)
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install go-winres
+        shell: pwsh
+        run: go install github.com/tc-hib/go-winres@latest
+
+      - name: Run static analysis and unit tests
+        shell: pwsh
+        run: |
+          go vet ./...
+          go test -short ./...
+
+      - name: Import Authenticode signing certificate (optional)
+        id: cert
+        if: ${{ secrets.SIGN_CERT_PFX_BASE64 != '' && secrets.SIGN_CERT_PASSWORD != '' }}
+        shell: pwsh
+        env:
+          PFX_BASE64: ${{ secrets.SIGN_CERT_PFX_BASE64 }}
+          PFX_PASSWORD: ${{ secrets.SIGN_CERT_PASSWORD }}
+        run: |
+          $pfxPath = Join-Path $env:RUNNER_TEMP "codesign.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:PFX_BASE64))
+          $securePwd = ConvertTo-SecureString -String $env:PFX_PASSWORD -AsPlainText -Force
+          $cert = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $securePwd
+          Remove-Item -Path $pfxPath -Force
+          "thumbprint=$($cert.Thumbprint)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Build binary and MSI installer
+        shell: pwsh
+        run: |
+          $argsList = @(
+            "-Version", "${{ steps.version.outputs.value }}",
+            "-Arch", "${{ matrix.arch }}"
+          )
+          if ("${{ steps.cert.outputs.thumbprint }}" -ne "") {
+            $signtoolDir = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" |
+              Sort-Object FullName -Descending |
+              Select-Object -First 1 -ExpandProperty DirectoryName
+            if ($signtoolDir) { $env:PATH = "$signtoolDir;$env:PATH" }
+            $argsList += @("-SignCertThumbprint", "${{ steps.cert.outputs.thumbprint }}")
+          }
+          & .\scripts\build-msi.ps1 @argsList
+
+      - name: Clean up signing certificate from runner store
+        if: ${{ always() && steps.cert.outputs.thumbprint != '' }}
+        shell: pwsh
+        run: |
+          Remove-Item -Path "Cert:\CurrentUser\My\${{ steps.cert.outputs.thumbprint }}" -Force -ErrorAction SilentlyContinue
+
+      - name: Upload MSI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: falatracker-${{ steps.version.outputs.value }}-${{ matrix.arch }}
+          path: build/falatracker-${{ steps.version.outputs.value }}-${{ matrix.arch }}.msi
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+
+    steps:
+      - name: Download all MSI artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Generate SHA-256 checksums
+        shell: pwsh
+        run: |
+          Set-Location release-assets
+          Get-ChildItem -Filter "*.msi" | Sort-Object Name | ForEach-Object {
+            $hash = (Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($_.Name)"
+          } | Out-File -FilePath "checksums.txt" -Encoding ascii
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            release-assets/*.msi
+            release-assets/checksums.txt
