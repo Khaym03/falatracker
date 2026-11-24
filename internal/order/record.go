@@ -7,6 +7,7 @@ import "time"
 // Lifecycle:
 //
 //	(not in store) --download+convert--> ready --PAD loads it into Dynamics--> loaded
+//	                                 \-> rejected (blocked by a business rule; never loaded)
 //
 // An order whose download or conversion fails is not stored, so it is
 // retried in the next cycle.
@@ -20,11 +21,16 @@ const (
 	// StatusLoaded means PAD confirmed (POST /orders/{number}/loaded) that the
 	// order was loaded into Dynamics.
 	StatusLoaded Status = "loaded"
+
+	// StatusRejected means the order failed a blocking business rule (such as
+	// the minimum purchase amount) and must not be loaded into Dynamics. It
+	// stays in the store so it is not downloaded again.
+	StatusRejected Status = "rejected"
 )
 
 // Valid reports whether s is a known status.
 func (s Status) Valid() bool {
-	return s == StatusReady || s == StatusLoaded
+	return s == StatusReady || s == StatusLoaded || s == StatusRejected
 }
 
 // Files are the paths of the files kept for an order.

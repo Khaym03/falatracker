@@ -53,12 +53,16 @@ func (c *Converter) ConvertTo(files order.Files, outPath string) (order.Record, 
 	}
 
 	files.Standard = outPath
-	return order.Record{
+	rec := order.Record{
 		OrderNumber: o.Number,
 		BillingDate: BillingDate(o.IssueDate, o.DeliveryEnd).Format(order.BillingDateLayout),
 		Files:       files,
 		Issues:      res.Issues,
-	}, nil
+	}
+	if res.Rejected {
+		rec.Status = order.StatusRejected
+	}
+	return rec, nil
 }
 
 // OutputName is the standard file name of an order, following the existing

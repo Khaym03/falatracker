@@ -63,5 +63,7 @@
 //
 //   - line level, in the Error/OBSERVACION columns (same wording as Core.py);
 //   - order level, in Result.Issues: totals vs "Total OC bruto", units per
-//     SKU vs the distribution file, placeholder customer data.
+//     SKU vs the distribution file, minimum purchase amount ($500.000 COP by
+//     default, which also marks the order as rejected), placeholder customer
+//     data.
 package falabella

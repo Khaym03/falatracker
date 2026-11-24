@@ -16,11 +16,12 @@ import (
 
 // conversionOptions are the flags shared by the tracker and `convert`.
 type conversionOptions struct {
-	template      string
-	customerTaxID string
-	customerName  string
-	paymentTerms  string
-	vat           float64 // negative = unknown
+	template       string
+	customerTaxID  string
+	customerName   string
+	paymentTerms   string
+	vat            float64 // negative = unknown
+	minOrderAmount float64 // 0 disables the minimum purchase check
 }
 
 func addConversionFlags(fs *pflag.FlagSet, o *conversionOptions) {
@@ -30,19 +31,24 @@ func addConversionFlags(fs *pflag.FlagSet, o *conversionOptions) {
 	fs.StringVar(&o.customerName, "customer-name", placeholder.Name, "customer name for the CLIENTE column")
 	fs.StringVar(&o.paymentTerms, "payment-terms", placeholder.PaymentTerms, "payment terms when the report has none")
 	fs.Float64Var(&o.vat, "vat", -1, "VAT % for the IVA column; negative leaves it empty (unknown)")
+	fs.Float64Var(&o.minOrderAmount, "min-order-amount", placeholder.MinOrderAmount, "minimum order subtotal; orders below it are rejected (0 disables)")
 }
 
 // converter loads the template (failing fast if it is invalid) and builds
 // the Falabella converter.
 func (o conversionOptions) converter() (*falabella.Converter, error) {
+	if o.minOrderAmount < 0 {
+		return nil, fmt.Errorf("--min-order-amount must not be negative")
+	}
 	t, err := standard.LoadTemplate(resolveTemplatePath(o.template))
 	if err != nil {
 		return nil, err
 	}
 	customer := falabella.Customer{
-		TaxID:        o.customerTaxID,
-		Name:         o.customerName,
-		PaymentTerms: o.paymentTerms,
+		TaxID:          o.customerTaxID,
+		Name:           o.customerName,
+		PaymentTerms:   o.paymentTerms,
+		MinOrderAmount: o.minOrderAmount,
 	}
 	if o.vat >= 0 {
 		vat := o.vat

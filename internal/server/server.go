@@ -92,7 +92,7 @@ func (s *Server) handleListOrders(w http.ResponseWriter, r *http.Request) {
 	status := order.Status(r.URL.Query().Get("status"))
 	if status != "" && !status.Valid() {
 		writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": fmt.Sprintf("invalid status %q: use %q or %q", status, order.StatusReady, order.StatusLoaded),
+			"error": fmt.Sprintf("invalid status %q: use %q, %q or %q", status, order.StatusReady, order.StatusLoaded, order.StatusRejected),
 		})
 		return
 	}

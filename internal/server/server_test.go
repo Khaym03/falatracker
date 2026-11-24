@@ -23,6 +23,7 @@ func newTestServer(t *testing.T, stop func()) (*Server, *order.MemoryStore) {
 		{OrderNumber: "1", Status: order.StatusReady, BillingDate: "2026-11-03"},
 		{OrderNumber: "2", Status: order.StatusLoaded, BillingDate: "2026-11-01"},
 		{OrderNumber: "3", Status: order.StatusReady, BillingDate: "2026-12-01"},
+		{OrderNumber: "4", Status: order.StatusRejected, BillingDate: "2026-11-03"},
 	} {
 		if err := store.Save(r); err != nil {
 			t.Fatal(err)
@@ -64,9 +65,10 @@ func TestListOrders(t *testing.T) {
 		target string
 		want   []string
 	}{
-		{"/orders", []string{"1", "2", "3"}},
+		{"/orders", []string{"1", "2", "3", "4"}},
 		{"/orders?status=ready", []string{"1", "3"}},
 		{"/orders?status=loaded", []string{"2"}},
+		{"/orders?status=rejected", []string{"4"}},
 	}
 	for _, tt := range tests {
 		rec := do(t, s, http.MethodGet, tt.target)

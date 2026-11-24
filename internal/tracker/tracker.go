@@ -142,7 +142,11 @@ func (t *Tracker) RunOnce(ctx context.Context) (int, error) {
 		for _, issue := range rec.Issues {
 			log.Warn("order issue", "issue", issue)
 		}
-		log.Info("order ready", "billing_date", rec.BillingDate, "standard", rec.Files.Standard)
+		if rec.Status == order.StatusRejected {
+			log.Warn("order rejected", "standard", rec.Files.Standard)
+		} else {
+			log.Info("order ready", "billing_date", rec.BillingDate, "standard", rec.Files.Standard)
+		}
 	}
 }
 
@@ -161,7 +165,9 @@ func (t *Tracker) process(ctx context.Context, s Session, orderNumber string) (o
 		return order.Record{}, fmt.Errorf("convert: report is for order %q", rec.OrderNumber)
 	}
 
-	rec.Status = order.StatusReady
+	if rec.Status == "" {
+		rec.Status = order.StatusReady
+	}
 	rec.ProcessedAt = t.now()
 	return rec, nil
 }

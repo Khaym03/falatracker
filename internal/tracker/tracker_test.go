@@ -41,6 +41,7 @@ func (f *fakeSession) DownloadReports(_ context.Context, n string) (order.Files,
 type fakeConverter struct {
 	failOn   map[string]bool
 	wrongFor map[string]bool // returns a record for another order
+	rejectOn map[string]bool // returns a record with StatusRejected
 }
 
 func (c *fakeConverter) Convert(files order.Files) (order.Record, error) {
@@ -52,7 +53,11 @@ func (c *fakeConverter) Convert(files order.Files) (order.Record, error) {
 		n = "other"
 	}
 	files.Standard = n + "-standard.xlsx"
-	return order.Record{OrderNumber: n, BillingDate: "2026-11-03", Files: files, Issues: []string{"issue"}}, nil
+	rec := order.Record{OrderNumber: n, BillingDate: "2026-11-03", Files: files, Issues: []string{"issue"}}
+	if c.rejectOn[n] {
+		rec.Status = order.StatusRejected
+	}
+	return rec, nil
 }
 
 // failingStore fails every Save.
@@ -123,6 +128,36 @@ func TestRunOnceSavesTheConvertedRecord(t *testing.T) {
 	}
 	if r.Files.Products != "1-products.xlsx" || r.Files.Standard != "1-standard.xlsx" || r.BillingDate != "2026-11-03" {
 		t.Errorf("record files/billing = %+v", r)
+	}
+}
+
+func TestRunOncePreservesRejectedStatusAndDoesNotRedownload(t *testing.T) {
+	store := order.NewMemoryStore()
+	s := &fakeSession{orders: []order.PurchaseOrder{pending("small"), pending("ok")}}
+	conv := &fakeConverter{rejectOn: map[string]bool{"small": true}}
+	tr := newTracker(s, conv, store)
+
+	n, err := tr.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("RunOnce: %v", err)
+	}
+	if n != 2 {
+		t.Errorf("processed = %d, want 2", n)
+	}
+	if got := store.List(order.StatusReady); len(got) != 1 || got[0].OrderNumber != "ok" {
+		t.Errorf("ready = %+v, want only ok", got)
+	}
+	if got := store.List(order.StatusRejected); len(got) != 1 || got[0].OrderNumber != "small" {
+		t.Errorf("rejected = %+v, want only small", got)
+	}
+
+	// Next cycle must not re-download the rejected order.
+	s.downloads = nil
+	if _, err := tr.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(s.downloads) != 0 {
+		t.Errorf("second cycle downloads = %v, want none", s.downloads)
 	}
 }
 

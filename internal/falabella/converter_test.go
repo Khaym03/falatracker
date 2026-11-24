@@ -44,8 +44,15 @@ func TestConverterConvert(t *testing.T) {
 	if rec.Files.Products != files.Products || rec.Files.Distribution != files.Distribution {
 		t.Errorf("record lost the report paths: %+v", rec.Files)
 	}
-	if !slices.Equal(rec.Issues, []string{"Datos de cliente pendientes: RUC/NIT, condición de pago, IVA"}) {
-		t.Errorf("issues = %q", rec.Issues)
+	if rec.Status != order.StatusRejected {
+		t.Errorf("status = %q, want %q", rec.Status, order.StatusRejected)
+	}
+	wantIssues := []string{
+		"Pedido por debajo del mínimo de compra (135000.00 < 500000.00): no radicar",
+		"Datos de cliente pendientes: RUC/NIT, condición de pago, IVA",
+	}
+	if !slices.Equal(rec.Issues, wantIssues) {
+		t.Errorf("issues = %q, want %q", rec.Issues, wantIssues)
 	}
 
 	// Check a few cells of the written file by header.

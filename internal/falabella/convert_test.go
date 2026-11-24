@@ -86,10 +86,57 @@ func TestConvertWithPlaceholderCustomer(t *testing.T) {
 	if l.Total != l.Subtotal {
 		t.Errorf("Total = %v, want Subtotal %v", l.Total, l.Subtotal)
 	}
-	want := []string{"Datos de cliente pendientes: RUC/NIT, condición de pago, IVA"}
+	if !res.Rejected {
+		t.Error("expected sample order (135000) to be rejected under default minimum (500000)")
+	}
+	want := []string{
+		"Pedido por debajo del mínimo de compra (135000.00 < 500000.00): no radicar",
+		"Datos de cliente pendientes: RUC/NIT, condición de pago, IVA",
+	}
 	if !slices.Equal(res.Issues, want) {
 		t.Errorf("issues = %q, want %q", res.Issues, want)
 	}
+}
+
+func TestConvertMinOrderAmount(t *testing.T) {
+	t.Run("below minimum is rejected", func(t *testing.T) {
+		o, dist := sampleOrder() // subtotal = 135000
+		c := realCustomer()
+		c.MinOrderAmount = DefaultMinOrderAmount
+		res := Convert(o, dist, "x.xlsx", c, NoCatalog{})
+		if !res.Rejected {
+			t.Fatal("expected Rejected = true")
+		}
+		want := []string{"Pedido por debajo del mínimo de compra (135000.00 < 500000.00): no radicar"}
+		if !slices.Equal(res.Issues, want) {
+			t.Errorf("issues = %q, want %q", res.Issues, want)
+		}
+	})
+
+	t.Run("at minimum is accepted", func(t *testing.T) {
+		o, dist := sampleOrder()
+		o.Products[2].Cost = 405000 // 2*10000 + 3*25000 + 1*405000 = 500000
+		o.GrossTotal = 500000
+		c := realCustomer()
+		c.MinOrderAmount = DefaultMinOrderAmount
+		res := Convert(o, dist, "x.xlsx", c, NoCatalog{})
+		if res.Rejected {
+			t.Errorf("expected Rejected = false, issues = %q", res.Issues)
+		}
+		if len(res.Issues) != 0 {
+			t.Errorf("issues = %q, want none", res.Issues)
+		}
+	})
+
+	t.Run("zero disables minimum check", func(t *testing.T) {
+		o, dist := sampleOrder()
+		c := realCustomer()
+		c.MinOrderAmount = 0
+		res := Convert(o, dist, "x.xlsx", c, NoCatalog{})
+		if res.Rejected || len(res.Issues) != 0 {
+			t.Errorf("rejected=%v issues=%q, want accepted with no issues", res.Rejected, res.Issues)
+		}
+	})
 }
 
 func TestConvertPaymentTermsFromReportWin(t *testing.T) {

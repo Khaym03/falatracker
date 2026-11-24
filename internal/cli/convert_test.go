@@ -36,6 +36,7 @@ func TestConvertCommand(t *testing.T) {
 	stdout, err := runConvert(t,
 		"--products", products, "--distribution", distribution, "-o", out,
 		"--customer-tax-id", "800000000-1", "--payment-terms", "60 DIAS", "--vat", "19",
+		"--min-order-amount", "0",
 	)
 	if err != nil {
 		t.Fatalf("convert: %v", err)
@@ -72,7 +73,11 @@ func TestConvertCommandWithPlaceholders(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &rec); err != nil {
 		t.Fatal(err)
 	}
+	if rec.Status != order.StatusRejected {
+		t.Errorf("status = %q, want %q", rec.Status, order.StatusRejected)
+	}
 	want := []string{
+		"Pedido por debajo del mínimo de compra (135000.00 < 500000.00): no radicar",
 		"Sin archivo de distribución: no se validaron unidades por tienda",
 		"Datos de cliente pendientes: RUC/NIT, condición de pago, IVA",
 	}
@@ -91,6 +96,9 @@ func TestConvertCommandErrors(t *testing.T) {
 	}
 	if _, err := runConvert(t, "--products", filepath.Join(t.TempDir(), "missing.xlsx")); err == nil {
 		t.Error("missing file: expected an error")
+	}
+	if _, err := runConvert(t, "--products", filepath.Join(t.TempDir(), "missing.xlsx"), "--min-order-amount", "-1"); err == nil || !strings.Contains(err.Error(), "min-order-amount") {
+		t.Errorf("negative --min-order-amount: error = %v", err)
 	}
 }
 

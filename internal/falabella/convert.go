@@ -13,6 +13,10 @@ import (
 // meant to be obvious in the generated file so it is never loaded by mistake.
 const Pending = "PENDIENTE"
 
+// DefaultMinOrderAmount is the minimum purchase subtotal in COP required by
+// NAOS Colombia to accept and file a purchase order.
+const DefaultMinOrderAmount = 500000.0
+
 // tolerance is the largest difference between two amounts that is still
 // considered equal (same threshold as Core.py; revisit for COP).
 const tolerance = 0.10
@@ -23,15 +27,21 @@ const tolerance = 0.10
 // when the real NIT, payment terms and VAT are known, pass them as flags (no
 // code change needed).
 type Customer struct {
-	TaxID        string
-	Name         string
-	PaymentTerms string
-	VATPct       *float64 // nil = unknown
+	TaxID          string
+	Name           string
+	PaymentTerms   string
+	VATPct         *float64 // nil = unknown
+	MinOrderAmount float64  // 0 disables the minimum purchase check
 }
 
 // PlaceholderCustomer is the Customer used until the real data is available.
 func PlaceholderCustomer() Customer {
-	return Customer{TaxID: Pending, Name: "FALABELLA (" + Pending + ")", PaymentTerms: Pending}
+	return Customer{
+		TaxID:          Pending,
+		Name:           "FALABELLA (" + Pending + ")",
+		PaymentTerms:   Pending,
+		MinOrderAmount: DefaultMinOrderAmount,
+	}
 }
 
 // missing lists the customer fields that are still placeholders.
@@ -75,8 +85,9 @@ func (NoCatalog) Lookup(string) (Item, bool) { return Item{}, false }
 
 // Result of a conversion.
 type Result struct {
-	Lines  []standard.Line
-	Issues []string // order-level problems
+	Lines    []standard.Line
+	Issues   []string // order-level problems
+	Rejected bool     // true when a blocking business rule fails (e.g. below minimum purchase)
 }
 
 // Convert maps an order to standard lines and runs the checks. It never
@@ -148,6 +159,10 @@ func Convert(o Order, dist []Allocation, sourceDocument string, customer Custome
 
 	if math.Abs(gross-o.GrossTotal) > tolerance {
 		res.Issues = append(res.Issues, fmt.Sprintf("Suma de subtotales (%.2f) distinta al Total OC bruto (%.2f)", gross, o.GrossTotal))
+	}
+	if customer.MinOrderAmount > 0 && round2(gross) < customer.MinOrderAmount {
+		res.Rejected = true
+		res.Issues = append(res.Issues, fmt.Sprintf("Pedido por debajo del mínimo de compra (%.2f < %.2f): no radicar", gross, customer.MinOrderAmount))
 	}
 	if dist == nil {
 		res.Issues = append(res.Issues, "Sin archivo de distribución: no se validaron unidades por tienda")
