@@ -76,8 +76,9 @@ try {
     $WinResJson   = Join-Path $RepoRoot "winres\winres.json"
     $WixProjPath  = Join-Path $RepoRoot "packaging\windows\falatracker.wixproj"
     $TemplatePath = Join-Path $RepoRoot "templates\standard.xlsx"
-    $ExePath      = Join-Path $BuildDir "falatracker.exe"
-    $MsiPath      = Join-Path $BuildDir "falatracker-$Version-$Arch.msi"
+    $ExePath        = Join-Path $BuildDir "falatracker.exe"
+    $ReleaseExePath = Join-Path $BuildDir "falatracker-$Version-windows-$GoArch.exe"
+    $MsiPath        = Join-Path $BuildDir "falatracker-$Version-$Arch.msi"
     $WinVersion   = "$Version.0"
 
     function Assert-CommandExists {
@@ -136,6 +137,8 @@ try {
         Invoke-CodeSign -FilePath $ExePath -Thumbprint $SignCertThumbprint -TimestampServer $TimestampUrl
     }
 
+    Copy-Item -Path $ExePath -Destination $ReleaseExePath -Force
+
     Write-Host "==> [4/5] Building MSI installer via WiX v5 SDK: $MsiPath" -ForegroundColor Cyan
     & dotnet build $WixProjPath `
         -c Release `
@@ -156,9 +159,10 @@ try {
 
     Write-Host ""
     Write-Host "Build completed successfully:" -ForegroundColor Green
-    Write-Host "  Version: v$Version ($Commit)"
-    Write-Host "  Binary : $ExePath"
-    Write-Host "  MSI    : $MsiPath"
+    Write-Host "  Version    : v$Version ($Commit)"
+    Write-Host "  Binary     : $ExePath"
+    Write-Host "  Release Exe: $ReleaseExePath"
+    Write-Host "  MSI        : $MsiPath"
 }
 finally {
     Get-ChildItem -Path $RepoRoot -Filter "*.syso" -File -ErrorAction SilentlyContinue |

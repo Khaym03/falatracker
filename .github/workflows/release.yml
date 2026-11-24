@@ -1,4 +1,4 @@
-name: Release Windows MSI
+name: Release Windows MSI & Executable
 
 on:
   push:
@@ -16,12 +16,14 @@ permissions:
 
 jobs:
   build:
-    name: Build MSI (${{ matrix.arch }})
+    name: Build Windows (${{ matrix.arch }})
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
-        arch: [x64]
+        include:
+          - arch: x64
+            goarch: amd64
 
     steps:
       - name: Checkout repository
@@ -103,11 +105,13 @@ jobs:
         run: |
           Remove-Item -Path "Cert:\CurrentUser\My\${{ steps.cert.outputs.thumbprint }}" -Force -ErrorAction SilentlyContinue
 
-      - name: Upload MSI artifact
+      - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
           name: falatracker-${{ steps.version.outputs.value }}-${{ matrix.arch }}
-          path: build/falatracker-${{ steps.version.outputs.value }}-${{ matrix.arch }}.msi
+          path: |
+            build/falatracker-${{ steps.version.outputs.value }}-${{ matrix.arch }}.msi
+            build/falatracker-${{ steps.version.outputs.value }}-windows-${{ matrix.goarch }}.exe
           if-no-files-found: error
 
   release:
@@ -117,7 +121,7 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Download all MSI artifacts
+      - name: Download all release artifacts
         uses: actions/download-artifact@v4
         with:
           path: release-assets
@@ -127,7 +131,7 @@ jobs:
         shell: pwsh
         run: |
           Set-Location release-assets
-          Get-ChildItem -Filter "*.msi" | Sort-Object Name | ForEach-Object {
+          Get-ChildItem -File | Where-Object { $_.Extension -in ".msi", ".exe" } | Sort-Object Name | ForEach-Object {
             $hash = (Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
             "$hash  $($_.Name)"
           } | Out-File -FilePath "checksums.txt" -Encoding ascii
@@ -138,4 +142,5 @@ jobs:
           generate_release_notes: true
           files: |
             release-assets/*.msi
+            release-assets/*.exe
             release-assets/checksums.txt
