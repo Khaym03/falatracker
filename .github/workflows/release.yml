@@ -84,18 +84,18 @@ jobs:
       - name: Build binary and MSI installer
         shell: pwsh
         run: |
-          $argsList = @(
-            "-Version", "${{ steps.version.outputs.value }}",
-            "-Arch", "${{ matrix.arch }}"
-          )
+          $buildParams = @{
+            Version = "${{ steps.version.outputs.value }}"
+            Arch    = "${{ matrix.arch }}"
+          }
           if ("${{ steps.cert.outputs.thumbprint }}" -ne "") {
             $signtoolDir = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" |
               Sort-Object FullName -Descending |
               Select-Object -First 1 -ExpandProperty DirectoryName
             if ($signtoolDir) { $env:PATH = "$signtoolDir;$env:PATH" }
-            $argsList += @("-SignCertThumbprint", "${{ steps.cert.outputs.thumbprint }}")
+            $buildParams.SignCertThumbprint = "${{ steps.cert.outputs.thumbprint }}"
           }
-          & .\scripts\build-msi.ps1 @argsList
+          & .\scripts\build-msi.ps1 @buildParams
 
       - name: Clean up signing certificate from runner store
         if: ${{ always() && steps.cert.outputs.thumbprint != '' }}
