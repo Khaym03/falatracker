@@ -3,7 +3,7 @@ name: Release Windows MSI
 on:
   push:
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       version:
@@ -65,12 +65,15 @@ jobs:
 
       - name: Import Authenticode signing certificate (optional)
         id: cert
-        if: ${{ secrets.SIGN_CERT_PFX_BASE64 != '' && secrets.SIGN_CERT_PASSWORD != '' }}
         shell: pwsh
         env:
           PFX_BASE64: ${{ secrets.SIGN_CERT_PFX_BASE64 }}
           PFX_PASSWORD: ${{ secrets.SIGN_CERT_PASSWORD }}
         run: |
+          if ([string]::IsNullOrWhiteSpace($env:PFX_BASE64) -or [string]::IsNullOrWhiteSpace($env:PFX_PASSWORD)) {
+            Write-Host "Skipping Authenticode certificate import (secrets not configured)."
+            exit 0
+          }
           $pfxPath = Join-Path $env:RUNNER_TEMP "codesign.pfx"
           [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:PFX_BASE64))
           $securePwd = ConvertTo-SecureString -String $env:PFX_PASSWORD -AsPlainText -Force
