@@ -79,7 +79,7 @@ func TestConvertCommandWithPlaceholders(t *testing.T) {
 	want := []string{
 		"Pedido por debajo del mínimo de compra (135000.00 < 500000.00): no radicar",
 		"Sin archivo de distribución: no se validaron unidades por tienda",
-		"Datos de cliente pendientes: RUC/NIT, condición de pago, IVA",
+		"Datos de cliente pendientes: RUC/NIT, condición de pago",
 	}
 	if !slices.Equal(rec.Issues, want) {
 		t.Errorf("issues = %q, want %q", rec.Issues, want)

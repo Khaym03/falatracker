@@ -49,7 +49,7 @@ func TestConverterConvert(t *testing.T) {
 	}
 	wantIssues := []string{
 		"Pedido por debajo del mínimo de compra (135000.00 < 500000.00): no radicar",
-		"Datos de cliente pendientes: RUC/NIT, condición de pago, IVA",
+		"Datos de cliente pendientes: RUC/NIT, condición de pago",
 	}
 	if !slices.Equal(rec.Issues, wantIssues) {
 		t.Errorf("issues = %q, want %q", rec.Issues, wantIssues)
@@ -64,6 +64,9 @@ func TestConverterConvert(t *testing.T) {
 	for header, want := range map[string]string{
 		standard.HeaderOrderNumber:  "1000001",
 		standard.HeaderProductCode:  "200002",
+		standard.HeaderItemNo:       "200002",
+		standard.HeaderObservation:  "",
+		standard.HeaderError:        "",
 		standard.HeaderBrand:        "MARCA A",
 		standard.HeaderQuantity:     "3",
 		standard.HeaderOrderDate:    "03/11/2026",

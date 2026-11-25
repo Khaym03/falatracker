@@ -57,8 +57,7 @@ func TestConvertMapsEveryColumn(t *testing.T) {
 		Description: "GEL DEMO 200 ML", Category: "LIMPIEZA",
 		Quantity: 3, UnitPrice: 25000, Subtotal: 75000, VATPct: &vat, Total: 89250,
 		SourceDocument: "oc-1000001-products-details.xlsx",
-		Observation:    "No encontrado en maestro (Búsqueda: 200002)",
-		Error:          "Sin código 'No' en la fila",
+		ItemNo:         "200002",
 	}
 	if l.VATPct == nil || *l.VATPct != 19 {
 		t.Errorf("VATPct = %v, want 19", l.VATPct)
@@ -91,7 +90,7 @@ func TestConvertWithPlaceholderCustomer(t *testing.T) {
 	}
 	want := []string{
 		"Pedido por debajo del mínimo de compra (135000.00 < 500000.00): no radicar",
-		"Datos de cliente pendientes: RUC/NIT, condición de pago, IVA",
+		"Datos de cliente pendientes: RUC/NIT, condición de pago",
 	}
 	if !slices.Equal(res.Issues, want) {
 		t.Errorf("issues = %q, want %q", res.Issues, want)
@@ -175,7 +174,7 @@ func TestConvertWithCatalog(t *testing.T) {
 	}
 
 	missing := res.Lines[2]
-	if missing.Catalog != nil || !strings.Contains(missing.Observation, "No encontrado en maestro (Búsqueda: 300003)") {
+	if missing.Catalog != nil || missing.ItemNo != "300003" || missing.Observation != "" || missing.Error != "" {
 		t.Errorf("line 3 = %+v", missing)
 	}
 }
@@ -190,13 +189,13 @@ func TestConvertLineProblems(t *testing.T) {
 	}
 	res := Convert(o, dist, "x.xlsx", realCustomer(), cat)
 
-	if got := res.Lines[0].Observation; got != "Unidades canceladas: 1" {
-		t.Errorf("cancelled units observation = %q", got)
+	if got := res.Lines[0].Observation; got != "" {
+		t.Errorf("observation should stay empty for now, got %q", got)
 	}
 	if got := res.Lines[1].Error; !strings.Contains(got, "descuentos=500.00") {
 		t.Errorf("line discount error = %q", got)
 	}
-	if l := res.Lines[2]; l.ProductCode != "" || !strings.Contains(l.Error, "menos de 6 dígitos") {
+	if l := res.Lines[2]; l.ProductCode != "" || l.ItemNo != "" || !strings.Contains(l.Error, "menos de 6 dígitos") {
 		t.Errorf("invalid VIN line = %+v", l)
 	}
 }

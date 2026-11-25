@@ -72,10 +72,12 @@ func TestWriteRepoTemplate(t *testing.T) {
 	}
 	out := filepath.Join(t.TempDir(), "nested", "out.xlsx")
 
+	first := sampleLine()
+	first.ItemNo = "012345"
 	second := sampleLine()
-	second.ProductCode, second.VATPct = "067890", nil
+	second.ProductCode, second.ItemNo, second.VATPct = "067890", "067890", nil
 	second.Catalog = &CatalogMatch{ItemNo: "A1", ParentCode: "P1", Price: 12500, DiscountPct: 20, Subtotal: 20000}
-	if err := tpl.Write(out, []Line{sampleLine(), second}); err != nil {
+	if err := tpl.Write(out, []Line{first, second}); err != nil {
 		t.Fatalf("Write: %v", err)
 	}
 
@@ -83,7 +85,7 @@ func TestWriteRepoTemplate(t *testing.T) {
 	if len(rows) != 2 {
 		t.Fatalf("got %d data rows, want 2", len(rows))
 	}
-	first := rows[0]
+	row1 := rows[0]
 	for h, want := range map[string]string{
 		HeaderTaxID:        "800000000-1",
 		HeaderOrderNumber:  "1000001",
@@ -95,13 +97,13 @@ func TestWriteRepoTemplate(t *testing.T) {
 		HeaderVAT:          "19",
 		HeaderTotal:        "23800",
 		HeaderCurrency:     "COP",
-		HeaderItemNo:       "", // no catalog match -> empty
+		HeaderItemNo:       "012345", // falls back to Line.ItemNo when no catalog match
 		HeaderNaosPrice:    "",
 		HeaderSize:         "", // not provided -> empty
 		HeaderError:        "err",
 	} {
-		if first[h] != want {
-			t.Errorf("row 1 %s = %q, want %q", h, first[h], want)
+		if row1[h] != want {
+			t.Errorf("row 1 %s = %q, want %q", h, row1[h], want)
 		}
 	}
 	if rows[1][HeaderVAT] != "" {

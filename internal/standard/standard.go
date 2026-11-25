@@ -107,6 +107,7 @@ type Line struct {
 	Total        float64
 
 	SourceDocument string
+	ItemNo         string // "No": item number in Business Central (Catalog.ItemNo wins when set)
 
 	// Catalog is the match against the NAOS product master; nil when the
 	// product was not found (or no master is configured).
@@ -158,7 +159,12 @@ var columns = []column{
 	{header: HeaderCategory, value: func(l Line) any { return l.Category }},
 	{header: HeaderHealthRegistry, value: func(l Line) any { return l.HealthRegistry }},
 	{header: HeaderSourceDocument, value: func(l Line) any { return l.SourceDocument }},
-	{header: HeaderItemNo, value: catalog(func(c *CatalogMatch) any { return c.ItemNo })},
+	{header: HeaderItemNo, value: func(l Line) any {
+		if l.Catalog != nil && l.Catalog.ItemNo != "" {
+			return l.Catalog.ItemNo
+		}
+		return l.ItemNo
+	}},
 	{header: HeaderParentCode, value: catalog(func(c *CatalogMatch) any { return c.ParentCode })},
 	{header: HeaderObservation, value: func(l Line) any { return l.Observation }},
 	{header: HeaderNaosPrice, value: catalog(func(c *CatalogMatch) any { return c.Price })},

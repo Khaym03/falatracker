@@ -36,10 +36,12 @@
 //	TOTAL                 SUBTOTAL × (1 + IVA)                = SUBTOTAL while IVA is unknown
 //	CATEGORÍA             Descripción clasificación
 //	DOCUMENTO ORIGEN      products-details file name
-//	No, CODIGO_PADRE,     Catalog (NAOS product master)       pending for Colombia: NoCatalog (1)
+//	No                    VIN (or Catalog)                    same as CÓD. PRODUCTO unless Catalog overrides it
+//	CODIGO_PADRE,         Catalog (NAOS product master)       pending for Colombia: NoCatalog (1)
 //	Precio/Descuento/
 //	Subtotal Naos,
 //	Diferencia
+//	OBSERVACION           -                                   kept empty for now
 //	TAMAÑO, UXC,          -                                   not provided by Falabella
 //	REG. SANITARIO
 //

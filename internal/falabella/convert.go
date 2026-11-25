@@ -53,9 +53,6 @@ func (c Customer) missing() []string {
 	if c.PaymentTerms == "" || c.PaymentTerms == Pending {
 		m = append(m, "condición de pago")
 	}
-	if c.VATPct == nil {
-		m = append(m, "IVA")
-	}
 	return m
 }
 
@@ -126,16 +123,14 @@ func Convert(o Order, dist []Allocation, sourceDocument string, customer Custome
 		}
 		gross += line.Subtotal
 
-		var obs, errs []string
+		var errs []string
 		code, err := ProductCode(p.VIN)
 		if err != nil {
 			errs = append(errs, err.Error())
 		}
 		line.ProductCode = code
+		line.ItemNo = code
 
-		if p.Cancelled > 0 {
-			obs = append(obs, fmt.Sprintf("Unidades canceladas: %d", p.Cancelled))
-		}
 		if p.LineCharges != 0 || p.LineDiscounts != 0 {
 			errs = append(errs, fmt.Sprintf("Cargos/descuentos de línea no soportados (cargos=%.2f, descuentos=%.2f)", p.LineCharges, p.LineDiscounts))
 		}
@@ -146,13 +141,9 @@ func Convert(o Order, dist []Allocation, sourceDocument string, customer Custome
 				if math.Abs(line.Catalog.Difference) > tolerance {
 					errs = append(errs, fmt.Sprintf("Diferencia de subtotal: doc=%.2f vs naos=%.2f", line.Subtotal, line.Catalog.Subtotal))
 				}
-			} else {
-				obs = append(obs, fmt.Sprintf("No encontrado en maestro (Búsqueda: %s)", code))
-				errs = append(errs, "Sin código 'No' en la fila")
 			}
 		}
 
-		line.Observation = strings.Join(obs, "; ")
 		line.Error = strings.Join(errs, "; ")
 		res.Lines = append(res.Lines, line)
 	}
